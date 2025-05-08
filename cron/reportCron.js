@@ -139,7 +139,8 @@ function getDominantPollutant(dataArray) {
   return tiedPollutants[0]?.toUpperCase() || "UNKNOWN";
 }
 
-cron.schedule("*/2 * * * *", async () => {
+// cron.schedule("*/2 * * * *", async () => {
+cron.schedule("0 */2 * * *", async () => {
   try {
     const now = getISTTime();
     const endTime = roundToPreviousEvenHour(now);
