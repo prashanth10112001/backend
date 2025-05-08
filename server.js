@@ -8,6 +8,7 @@ const familyRoute = require("./routes/family");
 const homeRoute = require("./routes/home");
 const roomRoute = require("./routes/room");
 const nodeRoute = require("./routes/node");
+const reportRoute = require("./routes/report");
 
 const app = express();
 const PORT = process.env.PORT || 3500;
@@ -49,6 +50,8 @@ mongoose.connection.on("disconnected", () => {
 
 connectDB();
 
+require("./cron/reportCron"); // Auto-run cron on server start
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 // Middleware
@@ -69,6 +72,7 @@ app.use("/api/family", familyRoute);
 app.use("/api/home", homeRoute);
 app.use("/api/room", roomRoute);
 app.use("/api/node", nodeRoute);
+app.use("/api/reports", reportRoute);
 
 // Start Server
 app.listen(PORT, () => {
