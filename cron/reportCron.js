@@ -13,29 +13,6 @@ function roundToPreviousEvenHour(date) {
   return newDate;
 }
 
-// function getDominantPollutant(dataArray) {
-//   const pollutantKeys = ["pm1", "pm2_5", "pm10", "co", "voc", "co2"];
-//   const totals = {};
-
-//   pollutantKeys.forEach((key) => (totals[key] = 0));
-
-//   dataArray.forEach((entry) => {
-//     pollutantKeys.forEach((key) => {
-//       totals[key] += entry.data[key] || 0;
-//     });
-//   });
-
-//   let dominant = "pm2_5";
-//   let max = -Infinity;
-//   for (const [key, value] of Object.entries(totals)) {
-//     if (value > max) {
-//       max = value;
-//       dominant = key;
-//     }
-//   }
-//   return dominant.toUpperCase();
-// }
-
 // cron.schedule("0 */2 * * *", async () => {
 
 function getDominantPollutant(dataArray) {
@@ -139,7 +116,7 @@ function getDominantPollutant(dataArray) {
   return tiedPollutants[0]?.toUpperCase() || "UNKNOWN";
 }
 
-// cron.schedule("*/2 * * * *", async () => {
+// cron.schedule("*/1 * * * *", async () => {
 cron.schedule("0 */2 * * *", async () => {
   try {
     const now = getISTTime();
@@ -154,7 +131,14 @@ cron.schedule("0 */2 * * *", async () => {
       isDeleted: { $ne: true },
     });
 
-    if (!rawData.length) return;
+    if (!rawData.length) {
+      console.log(
+        "No data found for the given time range.",
+        startTime,
+        endTime
+      );
+      return;
+    }
 
     const deviceGroups = {};
 
@@ -184,10 +168,13 @@ cron.schedule("0 */2 * * *", async () => {
           0
         ) / records.length;
 
+      let start = startTime.toISOString().replace("T", " ").substring(0, 19);
+      let end = endTime.toISOString().replace("T", " ").substring(0, 19);
+
       const report = new Report({
         nodeValue: nodeValue,
-        startTime,
-        endTime,
+        start,
+        end,
         avgAQI,
         avgTemperature,
         avgHumidity,
@@ -208,7 +195,15 @@ cron.schedule("0 */2 * * *", async () => {
       });
 
       await report.save();
-      console.log(`Saved report for device ${nodeValue}`);
+      console.log(
+        `Saved report for device ${nodeValue}, startTime: ${startTime
+          .toISOString()
+          .replace("T", " ")
+          .substring(0, 19)} , endTime: ${endTime
+          .toISOString()
+          .replace("T", " ")
+          .substring(0, 19)}`
+      );
     }
   } catch (error) {
     console.error("Error generating report:", error.message);

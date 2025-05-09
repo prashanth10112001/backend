@@ -3,7 +3,6 @@ const Report = require("../models/Report");
 const getReports = async (req, res) => {
   try {
     const { nodeValue } = req.query;
-    console.log("nodeavlue in reports", nodeValue);
 
     const filter = nodeValue ? { nodeValue } : {};
 
