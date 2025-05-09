@@ -10,6 +10,8 @@ const roomRoute = require("./routes/room");
 const nodeRoute = require("./routes/node");
 const reportRoute = require("./routes/report");
 
+require("dotenv").config();
+
 const app = express();
 const PORT = process.env.PORT || 3500;
 
@@ -51,6 +53,7 @@ mongoose.connection.on("disconnected", () => {
 connectDB();
 
 require("./cron/reportCron"); // Auto-run cron on server start
+require("./cron/dailyReportCron");
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());

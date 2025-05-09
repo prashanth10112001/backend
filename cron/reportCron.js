@@ -193,16 +193,16 @@ cron.schedule("0 */2 * * *", async () => {
         powerConsumption: (Math.random() * 10 + 5).toFixed(2),
         summary:
           avgAQI <= 1
-            ? "Good air quality"
-            : avgAQI === 2
-            ? "Moderate air quality"
-            : avgAQI === 3
-            ? "Satisfactory air quality"
-            : avgAQI === 4
-            ? "Poor air quality"
-            : avgAQI === 5
-            ? "Very poor air quality"
-            : "Severe pollution",
+            ? "Good"
+            : avgAQI > 1 && avgAQI <= 2
+            ? "Moderate"
+            : avgAQI > 2 && avgAQI <= 3
+            ? "Satisfactory"
+            : avgAQI > 3 && avgAQI <= 4
+            ? "Poor"
+            : avgAQI > 4 && avgAQI <= 5
+            ? "Very Poor"
+            : "Severe",
       });
 
       await report.save();
