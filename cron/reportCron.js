@@ -1,20 +1,22 @@
 const cron = require("node-cron");
-const Node = require("../models/Node.js");
-const Report = require("../models/Report.js");
+const Node = require("../models/Node");
+const Report = require("../models/Report");
 
-function getISTTime(date = new Date()) {
-  return new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
-}
+// Format a JS Date into "YYYY-MM-DD HH:mm:ss"
+const pad = (n) => String(n).padStart(2, "0");
 
-function roundToPreviousEvenHour(date) {
-  const newDate = new Date(date);
-  newDate.setMinutes(0, 0, 0);
-  newDate.setHours(Math.floor(newDate.getHours() / 2) * 2);
-  return newDate;
-}
+const formatDate = (date) => {
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+      date.getDate()
+    )} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+      date.getSeconds()
+    )}`
+  );
+};
 
-// cron.schedule("0 */2 * * *", async () => {
-
+// AQI Dominant Pollutant Helper
 function getDominantPollutant(dataArray) {
   const lookupTable = {
     pm10: [
@@ -68,24 +70,21 @@ function getDominantPollutant(dataArray) {
   };
 
   const priorityOrder = ["pm2_5", "pm10", "co", "no2", "voc", "co2"];
-  const pollutants = Object.keys(lookupTable);
   const avgValues = {};
 
-  // Calculate averages
-  for (const pollutant of pollutants) {
+  for (const pollutant of Object.keys(lookupTable)) {
     let sum = 0,
       count = 0;
     dataArray.forEach((entry) => {
-      const value = entry.data[pollutant];
-      if (typeof value === "number") {
-        sum += value;
+      const val = entry.data[pollutant];
+      if (typeof val === "number") {
+        sum += val;
         count++;
       }
     });
-    avgValues[pollutant] = count > 0 ? sum / count : -1;
+    avgValues[pollutant] = count ? sum / count : -1;
   }
 
-  // Determine AQI level for each
   const levels = {};
   for (const [pollutant, avg] of Object.entries(avgValues)) {
     const ranges = lookupTable[pollutant];
@@ -100,45 +99,60 @@ function getDominantPollutant(dataArray) {
     levels[pollutant] = level;
   }
 
-  // Find max level and handle tie-breaking
   const maxLevel = Math.max(...Object.values(levels));
-  const tiedPollutants = Object.entries(levels)
-    .filter(([_, level]) => level === maxLevel)
-    .map(([pollutant]) => pollutant);
-
-  // Use priority list to break ties
-  for (const pollutant of priorityOrder) {
-    if (tiedPollutants.includes(pollutant)) {
-      return pollutant.toUpperCase();
-    }
+  const tied = Object.entries(levels)
+    .filter(([_, lvl]) => lvl === maxLevel)
+    .map(([k]) => k);
+  for (const p of priorityOrder) {
+    if (tied.includes(p)) return p.toUpperCase();
   }
-
-  return tiedPollutants[0]?.toUpperCase() || "UNKNOWN";
+  return tied[0]?.toUpperCase() || "UNKNOWN";
 }
 
-// cron.schedule("*/1 * * * *", async () => {
+// ⏰ Every 2 hours on even hours (00:00, 02:00, ..., 22:00)
 cron.schedule("0 */2 * * *", async () => {
+  // cron.schedule("*/1 * * * *", async () => {
   try {
-    const now = getISTTime();
-    const endTime = roundToPreviousEvenHour(now);
-    const startTime = new Date(endTime.getTime() - 2 * 60 * 60 * 1000); // 2 hrs back
+    // const now = new Date();
+    // now.setUTCMinutes(0, 0, 0); // Round to top of hour
+    // const endTime = new Date(
+    //   Math.floor(now.getUTCHours() / 2) * 2 * 60 * 60 * 1000 +
+    //     now.setUTCHours(0)
+    // );
+    // const startTime = new Date(endTime.getTime() - 2 * 60 * 60 * 1000); // minus 2 hours
+
+    // const formattedStart = formatDate(startTime);
+    // const formattedEnd = formatDate(endTime);
+
+    const now = new Date();
+    now.setMinutes(0, 0, 0); // Round to top of hour
+
+    const hour = now.getHours();
+    const evenHour = Math.floor(hour / 2) * 2;
+
+    const endTime = new Date(now);
+    endTime.setHours(evenHour);
+
+    const startTime = new Date(endTime.getTime() - 2 * 60 * 60 * 1000);
+
+    const formattedStart = formatDate(startTime);
+    const formattedEnd = formatDate(endTime);
+    console.log("Checking data between:", formattedStart, "→", formattedEnd);
 
     const rawData = await Node.find({
       "activityData.timestamp": {
-        $gte: startTime.toISOString().replace("T", " ").substring(0, 19),
-        $lt: endTime.toISOString().replace("T", " ").substring(0, 19),
+        $gte: formattedStart,
+        $lt: formattedEnd,
       },
       isDeleted: { $ne: true },
     });
 
     if (!rawData.length) {
-      console.log(
-        "No data found for the given time range.",
-        startTime,
-        endTime
-      );
+      console.log("No data found in this window.");
       return;
     }
+
+    console.log("Data found:", rawData.length, "records.");
 
     const deviceGroups = {};
 
@@ -154,7 +168,7 @@ cron.schedule("0 */2 * * *", async () => {
       const avg = (arr, key) =>
         arr.reduce((sum, val) => sum + (val.data[key] || 0), 0) / arr.length;
 
-      const avgTemperature = avg(records, "temperature");
+      const avgTemp = avg(records, "temperature");
       const avgHumidity = avg(records, "humidity");
       const avgAQI =
         records.reduce(
@@ -168,15 +182,12 @@ cron.schedule("0 */2 * * *", async () => {
           0
         ) / records.length;
 
-      let start = startTime.toISOString().replace("T", " ").substring(0, 19);
-      let end = endTime.toISOString().replace("T", " ").substring(0, 19);
-
       const report = new Report({
-        nodeValue: nodeValue,
-        start,
-        end,
+        nodeValue,
+        startTime: formattedStart,
+        endTime: formattedEnd,
         avgAQI,
-        avgTemperature,
+        avgTemperature: avgTemp,
         avgHumidity,
         dominantPollutant: getDominantPollutant(records),
         powerConsumption: (Math.random() * 10 + 5).toFixed(2),
@@ -195,17 +206,9 @@ cron.schedule("0 */2 * * *", async () => {
       });
 
       await report.save();
-      console.log(
-        `Saved report for device ${nodeValue}, startTime: ${startTime
-          .toISOString()
-          .replace("T", " ")
-          .substring(0, 19)} , endTime: ${endTime
-          .toISOString()
-          .replace("T", " ")
-          .substring(0, 19)}`
-      );
+      console.log(`✅ Saved report for device ${nodeValue} , ${report}`);
     }
-  } catch (error) {
-    console.error("Error generating report:", error.message);
+  } catch (err) {
+    console.error("❌ Error generating report:", err.message);
   }
 });
