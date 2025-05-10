@@ -611,8 +611,8 @@ function getDominantPollutant(dataArray) {
 }
 
 // ⏰ Schedule: daily at 00:10 AM
-cron.schedule("*/1 * * * *", async () => {
-  // cron.schedule("10 0 * * *", async () => {
+// cron.schedule("*/1 * * * *", async () => {
+cron.schedule("10 0 * * *", async () => {
   try {
     const now = new Date();
     const reportDate = new Date(now);
