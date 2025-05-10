@@ -11,10 +11,13 @@ const quarterSchema = new mongoose.Schema({
   powerConsumption: String,
 });
 
-const dailyReportSchema = new mongoose.Schema({
-  nodeValue: { type: String, required: true },
-  date: { type: String, required: true }, // "YYYY-MM-DD"
-  quarters: [quarterSchema],
-});
+const dailyReportSchema = new mongoose.Schema(
+  {
+    nodeValue: { type: String, required: true },
+    date: { type: String, required: true }, // "YYYY-MM-DD"
+    quarters: [quarterSchema],
+  },
+  { timestamps: true }
+);
 
 module.exports = mongoose.model("DailyReport", dailyReportSchema);
